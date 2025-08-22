@@ -41,7 +41,8 @@ const base = defineConfig({
                   react: {
                     pragma: 'React.createElement',
                     pragmaFrag: 'React.Fragment',
-                    runtime: 'automatic',
+                    // runtime: 'automatic',
+                    runtime: 'classic',
                     development: !isProd,
                     refresh: !isProd,
                   },
@@ -77,7 +78,8 @@ const base = defineConfig({
                   react: {
                     pragma: 'React.createElement',
                     pragmaFrag: 'React.Fragment',
-                    runtime: 'automatic',
+                    // runtime: 'automatic',
+                    runtime: 'classic',
                     development: !isProd,
                     refresh: !isProd,
                   },
