@@ -39,7 +39,7 @@ const base = defineConfig({
                 },
                 transform: {
                   react: {
-                    pragma: 'React.createElement',
+                    pragma: 'ReactMini.createElement',
                     pragmaFrag: 'React.Fragment',
                     // runtime: 'automatic',
                     runtime: 'classic',
@@ -76,7 +76,7 @@ const base = defineConfig({
                 },
                 transform: {
                   react: {
-                    pragma: 'React.createElement',
+                    pragma: 'ReactMini.createElement',
                     pragmaFrag: 'React.Fragment',
                     // runtime: 'automatic',
                     runtime: 'classic',
