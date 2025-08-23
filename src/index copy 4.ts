@@ -15,11 +15,6 @@ type RElement = {
   effectTag?: 'PLACEMENT' | 'UPDATE' | 'DELETION';
   // 步骤 1: 在 Fiber 上添加 hooks 数组，用于存储 hook 数据
   hooks?: any[];
-  // 步骤 1: 增加 effectCallbacks 属性，用于暂存 effect
-  effectCallbacks?: {
-    callback: () => void | (() => void);
-    hook: any;
-  }[];
 };
 
 type Fiber = RElement;
@@ -122,7 +117,6 @@ let wipFiber: Fiber | null = null;
 // hookIndex 记录当前正在处理的 hook 的索引
 let hookIndex: number = 0;
 // =======================================================================
-let commitCounter = 0;
 
 // “提交阶段”的入口函数
 function commitRoot() {
@@ -133,74 +127,20 @@ function commitRoot() {
   // =======================================================================
   // 从根节点的第一个子节点开始，递归地将所有节点附加到 DOM
   commitWork(wipRoot!.child);
-  console.log(`Commit ${++commitCounter} 结束，执行 effect`);
-
   // =======================================================================
   // 步骤 2 (更新): 提交完成后，将 wipRoot 设为 currentRoot
   currentRoot = wipRoot;
-
   // =======================================================================
   // 提交完成后，重置 wipRoot，表示工作已完成
+
   wipRoot = null;
-  executeEffects(currentRoot!);
 }
 
-// 新增：递归执行 effect 的函数
-function executeEffects(fiber: Fiber) {
-  if (!fiber) return;
-
-  // React 遵循子 -> 父的顺序执行 effect
-  // 所以我们先递归处理子孙节点
-  executeEffects(fiber.child!);
-  executeEffects(fiber.sibling!);
-
-  // 再处理当前节点
-  if (fiber.effectCallbacks) {
-    fiber.effectCallbacks.forEach(effect => {
-      // 在执行新的 effect 之前，先执行上一次的 cleanup
-      if (effect.hook.cleanup) {
-        effect.hook.cleanup();
-      }
-      // 执行新的 effect，并把可能返回的 cleanup 函数存起来
-      const cleanup = effect.callback();
-      if (typeof cleanup === 'function') {
-        effect.hook.cleanup = cleanup;
-      }
-    });
-    // 清空待办事项
-    fiber.effectCallbacks = [];
-  }
-}
-
-// 步骤 4: 改造 commitDeletion，增加清理逻辑
 function commitDeletion(fiber: Fiber, domParent: HTMLElement | Text) {
-  // 当一个节点被删除时，执行其自身及所有子孙节点的 cleanup 函数
-  let node: Fiber | null = fiber;
-  while (node) {
-    if (node.hooks) {
-      node.hooks.forEach(hook => {
-        if (hook.cleanup) {
-          hook.cleanup();
-        }
-      });
-    }
-    if (node.child) {
-      node = node.child;
-      continue;
-    }
-    while (node) {
-      if (node === fiber) return; // Traversal complete
-      if (node.sibling) {
-        node = node.sibling;
-        break;
-      }
-      node = node.parent;
-    }
-  }
-
   if (fiber.dom) {
     domParent.removeChild(fiber.dom);
   } else if (fiber.child) {
+    // 步骤 4: 升级删除逻辑，以处理没有 DOM 的 Fiber 节点
     // 如果要删除的 Fiber 没有 dom，我们需要继续向下寻找它真正的子级 DOM 并删除
     commitDeletion(fiber.child, domParent);
   }
@@ -267,8 +207,6 @@ function workLoop(deadline: IdleDeadline) {
   // 此时，我们就开始“提交阶段”。
   if (!nextUnitOfWork && wipRoot) {
     commitRoot();
-    // 步骤 3: 在所有 DOM 操作完成后，执行所有收集到的 effect
-    // executeEffects(currentRoot!);
   }
   // 当浏览器再次空闲时，安排下一次循环。
   requestIdleCallback(workLoop);
@@ -334,51 +272,8 @@ function updateFunctionComponent(fiber: Fiber) {
 }
 
 // =======================================================================
-// 步骤 2: 实现 useEffect 函数
+// 步骤 3: 实现 useState 函数
 // =======================================================================
-// 辅助函数：比较依赖项是否变化
-function hasDepsChanged(prevDeps?: any[], nextDeps?: any[]): boolean {
-  if (!prevDeps) return true; // 第一次执行
-  if (!nextDeps) return true; // 如果不提供依赖数组，每次都执行
-  if (prevDeps.length !== nextDeps.length) return true;
-
-  // 逐一比较依赖项
-  for (let i = 0; i < prevDeps.length; i++) {
-    if (!Object.is(prevDeps[i], nextDeps[i])) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function useEffect(callback: () => void | (() => void), deps?: any[]) {
-  // 1. 拿到上一次的 hook 数据
-  const oldHook = wipFiber?.alternate?.hooks?.[hookIndex];
-
-  // 2. 比较依赖项，判断 effect 是否需要执行
-  const hasChanged = hasDepsChanged(oldHook?.deps, deps);
-
-  const newHook = {
-    deps,
-    cleanup: oldHook ? oldHook.cleanup : undefined,
-  };
-
-  if (hasChanged) {
-    // 如果需要执行，将 callback 暂存到 Fiber 的 effectCallbacks 数组中
-    if (!wipFiber!.effectCallbacks) {
-      wipFiber!.effectCallbacks = [];
-    }
-    wipFiber!.effectCallbacks.push({
-      callback,
-      hook: newHook,
-    });
-  }
-
-  // 3. 将新的 hook 推入 hooks 数组，移动指针
-  wipFiber!.hooks!.push(newHook);
-  hookIndex++;
-}
-
 function useState<T>(initial: T): [T, (action: T | ((prevState: T) => T)) => void] {
   // 1. 尝试获取上一次渲染时的 hook 数据
   const oldHook = wipFiber?.alternate?.hooks?.[hookIndex];
@@ -539,8 +434,6 @@ const ReactMini = {
   render,
   // 步骤 5: 导出 useState
   useState,
-  // 步骤 5: 导出 useEffect
-  useEffect,
 };
 
 export default ReactMini;
