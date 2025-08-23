@@ -142,7 +142,6 @@ function commitRoot() {
   // =======================================================================
   // 提交完成后，重置 wipRoot，表示工作已完成
   wipRoot = null;
-  executeEffects(currentRoot!);
 }
 
 // 新增：递归执行 effect 的函数
@@ -268,7 +267,7 @@ function workLoop(deadline: IdleDeadline) {
   if (!nextUnitOfWork && wipRoot) {
     commitRoot();
     // 步骤 3: 在所有 DOM 操作完成后，执行所有收集到的 effect
-    // executeEffects(currentRoot!);
+    executeEffects(currentRoot!);
   }
   // 当浏览器再次空闲时，安排下一次循环。
   requestIdleCallback(workLoop);
