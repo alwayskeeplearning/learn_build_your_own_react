@@ -1,16 +1,16 @@
-type RElement = {
+type Fiber = {
   // 步骤 1: 扩展 type 的定义，使其可以是一个函数
-  type: string | ((props: Record<string, any>) => RElement);
+  type: string | ((props: Record<string, any>) => Fiber);
   props: {
     [key: string]: any;
-    children: RElement[];
+    children: Fiber[];
   };
   dom: HTMLElement | Text | null;
-  parent: RElement | null;
-  child: RElement | null;
-  sibling: RElement | null;
+  parent: Fiber | null;
+  child: Fiber | null;
+  sibling: Fiber | null;
   // 新增 alternate 属性，用于连接新旧 Fiber 节点
-  alternate: RElement | null;
+  alternate: Fiber | null;
   // 新增 effectTag 属性，用于标记“提交阶段”需要执行的 DOM 操作
   effectTag?: 'PLACEMENT' | 'UPDATE' | 'DELETION';
   // 步骤 1: 在 Fiber 上添加 hooks 数组，用于存储 hook 数据
@@ -22,9 +22,7 @@ type RElement = {
   }[];
 };
 
-type Fiber = RElement;
-
-const createElement = (type: string, props: Record<string, any>, ...children: RElement[]) => {
+const createElement = (type: string, props: Record<string, any>, ...children: Fiber[]) => {
   return {
     type,
     props: {
@@ -325,7 +323,7 @@ function updateFunctionComponent(fiber: Fiber) {
 
   // --- 执行组件函数 ---
   // 组件内部对 useState 的调用会在这里发生
-  const component = fiber.type as (props: Record<string, any>) => RElement;
+  const component = fiber.type as (props: Record<string, any>) => Fiber;
   const children = [component(fiber.props)];
 
   // --- 收尾工作 ---
@@ -447,12 +445,13 @@ function useState<T>(initial: T): [T, (action: T | ((prevState: T) => T)) => voi
 // 步骤 3 (实现): `reconcileChildren` 函数
 // 这是 diff 算法的核心，它比较新旧子节点，并为差异打上 effectTag。
 // =======================================================================
-function reconcileChildren(wipFiber: Fiber, elements: RElement[]) {
+function reconcileChildren(wipFiber: Fiber, elements: Fiber[]) {
   let index = 0;
   // 获取旧 Fiber 树中对应的子节点链表的头节点
   let oldFiber = wipFiber.alternate && wipFiber.alternate.child;
   let prevSibling: Fiber | null = null;
   // 同时遍历新子元素数组和旧子 Fiber 链表
+  // 后面的|| oldFiber != null条件是用来处理旧的比多的多的情况 比如：旧列表: [A, B, C]和新列表: [A, B]
   while (index < elements.length || oldFiber != null) {
     const element = elements[index];
     let newFiber: Fiber | null = null;
@@ -471,7 +470,7 @@ function reconcileChildren(wipFiber: Fiber, elements: RElement[]) {
         parent: wipFiber,
         alternate: oldFiber!, // 连接到旧 Fiber
         effectTag: 'UPDATE',
-      } as RElement;
+      } as Fiber;
     }
     if (!sameType && element) {
       // -------------------------------------------------
@@ -509,7 +508,7 @@ function reconcileChildren(wipFiber: Fiber, elements: RElement[]) {
   }
 }
 
-const render = (element: RElement, container: HTMLElement) => {
+const render = (element: Fiber, container: HTMLElement) => {
   // 新的 render 函数本身不再执行工作。
   // 它只是配置好 Fiber 树的根节点，并设置好第一个工作单元。
   wipRoot = {
